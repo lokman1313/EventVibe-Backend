@@ -251,15 +251,22 @@ app.get("/api/event/:id", async (req: Request, res: Response) => {
 });
 
 // Update event — only the creator (client) or an admin
+// Update event — only the creator (client) or an admin
 app.patch(
-  "/api/event/update/:id",verifyToken,verifyAdmin,async (req: AuthedRequest, res: Response) => {
+  "/api/event/update/:id",
+  verifyToken,
+  verifyAdmin,
+  async (req: AuthedRequest, res: Response) => {
     try {
       if (!eventCollection) {
         res.status(500).send({ error: "Database not initialized yet!" });
         return;
       }
+      
       const id = req.params.id;
-      if (!ObjectId.isValid(id)) {
+      
+      // 🟢 Type Guard: Ensure 'id' is a string before passing to ObjectId
+      if (typeof id !== "string" || !ObjectId.isValid(id)) {
         res.status(400).send({ error: "Invalid event id" });
         return;
       }
@@ -270,8 +277,9 @@ app.patch(
         return;
       }
 
+      // 🟢 check user validation safely with optional chaining or toString
       if (
-        event.createdBy?.toString() !== req.user?._id.toString() &&
+        event.createdBy?.toString() !== req.user?._id?.toString() &&
         req.user?.role !== "admin"
       ) {
         res.status(403).send({ error: "Forbidden" });
@@ -291,6 +299,7 @@ app.patch(
 );
 
 // Delete event — only the creator an admin
+// Delete event — only the creator or an admin
 app.delete(
   "/api/event/delete/:id",
   verifyToken,
@@ -301,8 +310,11 @@ app.delete(
         res.status(500).send({ error: "Database not initialized yet!" });
         return;
       }
+      
       const id = req.params.id;
-      if (!ObjectId.isValid(id)) {
+
+      // 🟢 Type Guard: Ensure 'id' is a string
+      if (typeof id !== "string" || !ObjectId.isValid(id)) {
         res.status(400).send({ error: "Invalid event id" });
         return;
       }
@@ -313,8 +325,9 @@ app.delete(
         return;
       }
 
+      // 🟢 safe check of creator ownership
       if (
-        event.createdBy?.toString() !== req.user?._id.toString() &&
+        event.createdBy?.toString() !== req.user?._id?.toString() &&
         req.user?.role !== "admin"
       ) {
         res.status(403).send({ error: "Forbidden" });

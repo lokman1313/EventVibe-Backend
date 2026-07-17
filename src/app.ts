@@ -6,7 +6,8 @@ import express, {
 } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { MongoClient, Collection, ObjectId, Document } from "mongodb";
+import { MongoClient, Collection, ObjectId } from "mongodb";
+import type { Document } from "mongodb";
 
 dotenv.config();
 
@@ -119,11 +120,13 @@ app.patch(
   verifyAdmin,
   async (req: Request, res: Response) => {
     try {
-      const id = req.params.id;
-      if (!ObjectId.isValid(id)) {
+      const id = req.params.id; // 👈 dynamic types override context set up hobe
+      
+      if (typeof id !== "string" || !ObjectId.isValid(id)) {
         res.status(400).send({ error: "Invalid user id" });
         return;
       }
+      
       const updatedData = { ...req.body, updatedAt: new Date() };
       const result = await userCollection.updateOne(
         { _id: new ObjectId(id) },
@@ -143,10 +146,12 @@ app.delete(
   async (req: Request, res: Response) => {
     try {
       const id = req.params.id;
-      if (!ObjectId.isValid(id)) {
+      
+      if (typeof id !== "string" || !ObjectId.isValid(id)) {
         res.status(400).send({ error: "Invalid user id" });
         return;
       }
+      
       const result = await userCollection.deleteOne({ _id: new ObjectId(id) });
       res.send(result);
     } catch (error) {
@@ -230,7 +235,7 @@ app.get("/api/event/:id", async (req: Request, res: Response) => {
       return;
     }
     const id = req.params.id;
-    if (!ObjectId.isValid(id)) {
+    if (typeof id !== "string" || !ObjectId.isValid(id)) {
       res.status(400).send({ error: "Invalid event id" });
       return;
     }

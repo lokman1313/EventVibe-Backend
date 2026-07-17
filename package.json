@@ -1,12 +1,16 @@
 {
   "name": "event-vibe-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "src/app.ts",
+  "description": "EventVibe backend API (Express + MongoDB)",
+  "main": "dist/app.js",
   "scripts": {
-  "dev": "nodemon --watch src --ext ts,json --exec tsx src/app.ts",
-  "build": "tsc" 
-},
+    "dev": "nodemon --watch src --ext ts,json --exec tsx src/app.ts",
+    "build": "tsc",
+    "start": "node dist/app.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",

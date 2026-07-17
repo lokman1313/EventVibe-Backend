@@ -14,16 +14,45 @@ dotenv.config();
 const app: Express = express();
 const port = process.env.PORT || 5000;
 
-const uri = process.env.MONGODB_URI as string;
+const uri = process.env.MONGODB_URI;
 if (!uri) {
-  console.error("Error: MONGODB_URI is not defined in your .env file!");
-  // process.exit(1);
+  console.error(
+    "FATAL: MONGODB_URI environment variable is not set. Set it in your hosting platform's environment variables.",
+  );
 }
 
-const client = new MongoClient(uri);
+// Only construct the client if we actually have a URI, so a missing env var
+// doesn't crash the whole process at import time (important for serverless
+// cold starts, where the module can be re-evaluated).
+const client = uri ? new MongoClient(uri) : null;
+
+const allowedOrigins = (process.env.CLIENT_URL || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
 
 app.use(express.json());
-app.use(cors());
+app.use(
+  cors({
+    origin: allowedOrigins.length > 0 ? allowedOrigins : "*",
+    credentials: true,
+  }),
+);
+
+// Make sure every request has a DB connection ready (handles cold starts on
+// serverless platforms, where a top-level connect before the first request
+// isn't guaranteed to have finished yet). connectToMongoDB() itself caches
+// the connection, so this is cheap on warm invocations.
+app.use(async (_req: Request, _res: Response, next: NextFunction) => {
+  try {
+    await connectToMongoDB();
+  } catch {
+    // Route handlers already check `if (!xCollection)` and return a clean
+    // 500, so we just let the request continue rather than hard-failing
+    // the middleware chain here.
+  }
+  next();
+});
 
 // ---------- Collections ----------
 let userCollection: Collection<Document>;
@@ -251,11 +280,10 @@ app.get("/api/event/:id", async (req: Request, res: Response) => {
 });
 
 // Update event — only the creator (client) or an admin
-// Update event — only the creator (client) or an admin
 app.patch(
   "/api/event/update/:id",
   verifyToken,
-  verifyAdmin,
+  verifyRole("client", "admin"),
   async (req: AuthedRequest, res: Response) => {
     try {
       if (!eventCollection) {
@@ -309,12 +337,11 @@ app.patch(
   },
 );
 
-// Delete event — only the creator an admin
 // Delete event — only the creator or an admin
 app.delete(
   "/api/event/delete/:id",
   verifyToken,
-  verifyAdmin,
+  verifyRole("client", "admin"),
   async (req: AuthedRequest, res: Response) => {
     try {
       if (!eventCollection) {
@@ -355,26 +382,57 @@ app.delete(
 
 // ================= DB CONNECTION =================
 
-export async function connectToMongoDB() {
-  try {
-    // await client.connect();
-    const database = client.db("event-vibe");
-    userCollection = database.collection("user");
-    eventCollection = database.collection("event");
-    sessionCollection = database.collection("session");
-    console.log("Successfully connected to MongoDB!");
-  } catch (err) {
-    console.error("Failed to connect to MongoDB:", err);
-    // process.exit(1);
+// Tracks whether we've already connected, so serverless warm invocations
+// (or accidental repeat calls) don't reconnect every time.
+let dbConnectionPromise: Promise<void> | null = null;
+
+export function connectToMongoDB(): Promise<void> {
+  if (!client) {
+    return Promise.reject(
+      new Error("MONGODB_URI is not set — cannot connect to MongoDB."),
+    );
   }
+
+  // Reuse an in-flight or already-resolved connection instead of opening a
+  // new one on every call (important on Vercel, where the module can be
+  // reused across warm invocations of the same function).
+  if (!dbConnectionPromise) {
+    dbConnectionPromise = client
+      .connect()
+      .then(() => {
+        const database = client.db("event-vibe");
+        userCollection = database.collection("user");
+        eventCollection = database.collection("event");
+        sessionCollection = database.collection("session");
+        console.log("Successfully connected to MongoDB!");
+      })
+      .catch((err) => {
+        console.error("Failed to connect to MongoDB:", err);
+        // Allow a future request to retry instead of getting stuck forever
+        // on a failed connection attempt.
+        dbConnectionPromise = null;
+        throw err;
+      });
+  }
+
+  return dbConnectionPromise;
 }
 
-// ---------- Start server only after DB is ready ----------
-async function start() {
-  await connectToMongoDB();
-  app.listen(port, () => {
-    console.log(`Server listening on port ${port}`);
-  });
-}
+// Vercel imports this file as a serverless function and calls the exported
+// app directly — it must NOT call app.listen() itself. Every other platform
+// (Render, Railway, a plain VPS, local dev) needs a real listening server.
+export default app;
 
-start();
+if (process.env.VERCEL !== "1") {
+  connectToMongoDB()
+    .catch(() => {
+      // Error already logged in connectToMongoDB; keep booting so the
+      // health check route still responds and ops can see the server is up
+      // but misconfigured.
+    })
+    .finally(() => {
+      app.listen(port, () => {
+        console.log(`Server listening on port ${port}`);
+      });
+    });
+}

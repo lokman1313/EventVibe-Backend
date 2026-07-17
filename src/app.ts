@@ -262,9 +262,9 @@ app.patch(
         res.status(500).send({ error: "Database not initialized yet!" });
         return;
       }
-      
+
       const id = req.params.id;
-      
+
       // 🟢 Type Guard: Ensure 'id' is a string before passing to ObjectId
       if (typeof id !== "string" || !ObjectId.isValid(id)) {
         res.status(400).send({ error: "Invalid event id" });
@@ -277,9 +277,17 @@ app.patch(
         return;
       }
 
-      // 🟢 check user validation safely with optional chaining or toString
+      // 🟢 Safe handling for req.user._id to prevent TypeScript error
+      const loggedInUserId = req.user?._id;
+      
+      // Ensure we have a valid single string ID for the user
+      const userIdString = Array.isArray(loggedInUserId) 
+        ? loggedInUserId[0] 
+        : (loggedInUserId as string | undefined);
+
+      // 🟢 check user authorization safely
       if (
-        event.createdBy?.toString() !== req.user?._id?.toString() &&
+        event.createdBy?.toString() !== userIdString?.toString() &&
         req.user?.role !== "admin"
       ) {
         res.status(403).send({ error: "Forbidden" });
@@ -287,10 +295,13 @@ app.patch(
       }
 
       const updatedData = { ...req.body, updatedAt: new Date() };
+      
+      // MongoDB update করার সময়ও আইডি সেফলি পাস করা হলো
       const result = await eventCollection.updateOne(
         { _id: new ObjectId(id) },
         { $set: updatedData },
       );
+      
       res.send(result);
     } catch (error) {
       res.status(500).send({ error: (error as Error).message });

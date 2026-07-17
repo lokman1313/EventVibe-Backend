@@ -16,7 +16,7 @@ const port = process.env.PORT || 5000;
 const uri = process.env.MONGODB_URI as string;
 if (!uri) {
   console.error("Error: MONGODB_URI is not defined in your .env file!");
-  process.exit(1);
+  // process.exit(1);
 }
 
 const client = new MongoClient(uri);
@@ -328,7 +328,7 @@ app.delete(
 
 export async function connectToMongoDB() {
   try {
-    await client.connect();
+    // await client.connect();
     const database = client.db("event-vibe");
     userCollection = database.collection("user");
     eventCollection = database.collection("event");
@@ -336,7 +336,7 @@ export async function connectToMongoDB() {
     console.log("Successfully connected to MongoDB!");
   } catch (err) {
     console.error("Failed to connect to MongoDB:", err);
-    process.exit(1);
+    // process.exit(1);
   }
 }
 

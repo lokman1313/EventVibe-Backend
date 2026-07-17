@@ -2,27 +2,27 @@
   "name": "event-vibe-backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/app.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon --watch src --ext ts,json --exec tsx src/app.ts"
-  },
+  "dev": "nodemon --watch src --ext ts,json --exec tsx src/app.ts",
+  "build": "tsc" 
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
     "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
-    "@types/node": "^26.1.1",
+    "@types/express": "^5.0.0",
+    "@types/node": "^20.11.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.23.1",
-    "typescript": "^7.0.2"
+    "typescript": "^5.4.0"
   },
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1",
+    "express": "^5.0.0",
     "mongodb": "^7.5.0"
   }
 }

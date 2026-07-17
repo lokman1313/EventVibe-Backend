@@ -11,6 +11,15 @@ import type { Document } from "mongodb";
 
 dotenv.config();
 
+// Depending on the exact express/@types/express version that gets resolved,
+// route params can be typed as `string | string[]` (e.g. for wildcard/
+// repeated segments). None of our routes use that, but we normalize here
+// so type-checking is stable across dependency versions/environments.
+function getIdParam(req: Request): string | undefined {
+  const raw = (req.params as Record<string, string | string[]>).id;
+  return Array.isArray(raw) ? raw[0] : raw;
+}
+
 const app: Express = express();
 const port = process.env.PORT || 5000;
 
@@ -149,7 +158,7 @@ app.patch(
   verifyAdmin,
   async (req: Request, res: Response) => {
     try {
-      const id = req.params.id; // 👈 dynamic types override context set up hobe
+      const id = getIdParam(req);
       
       if (typeof id !== "string" || !ObjectId.isValid(id)) {
         res.status(400).send({ error: "Invalid user id" });
@@ -174,7 +183,7 @@ app.delete(
   verifyAdmin,
   async (req: Request, res: Response) => {
     try {
-      const id = req.params.id;
+      const id = getIdParam(req);
       
       if (typeof id !== "string" || !ObjectId.isValid(id)) {
         res.status(400).send({ error: "Invalid user id" });
@@ -263,7 +272,7 @@ app.get("/api/event/:id", async (req: Request, res: Response) => {
       res.status(500).send({ error: "Database not initialized yet!" });
       return;
     }
-    const id = req.params.id;
+    const id = getIdParam(req);
     if (typeof id !== "string" || !ObjectId.isValid(id)) {
       res.status(400).send({ error: "Invalid event id" });
       return;
@@ -291,7 +300,7 @@ app.patch(
         return;
       }
 
-      const id = req.params.id;
+      const id = getIdParam(req);
 
       // 🟢 Type Guard: Ensure 'id' is a string before passing to ObjectId
       if (typeof id !== "string" || !ObjectId.isValid(id)) {
@@ -349,7 +358,7 @@ app.delete(
         return;
       }
       
-      const id = req.params.id;
+      const id = getIdParam(req);
 
       // 🟢 Type Guard: Ensure 'id' is a string
       if (typeof id !== "string" || !ObjectId.isValid(id)) {
